@@ -26,7 +26,7 @@ Modify `SFM/build_3rd.sh` and `SFM/CMakeLists.txt` if necessary (such that you h
   
 ```bash
 # clone the repo
-git clone --recursive https://github.com/Jianxff/WebSFM.git
+git clone --recursive https://github.com/openhtm/WebSFM.git
 
 # build 3rd party
 cd SFM
