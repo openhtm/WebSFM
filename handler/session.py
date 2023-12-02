@@ -23,19 +23,20 @@ from aiortc.contrib.media import MediaRelay
 # sfm module
 import numpy as np
 from SFM import pysfm
-from SFM.mvs import MVS
+from SFM.mvs import MVSPipe
 
-MVS_BIN = Path('/usr/local/bin/OpenMVS')
+MVS_PIPE = MVSPipe(Path('/usr/local/bin/OpenMVS'))
 
 ROOTDIR = Path(__file__).parent.parent
 DATA_DIR = ROOTDIR/'static/usr'
+BASE_DIR = DATA_DIR/'test'
+SCENE_DIR = BASE_DIR/'scene'
 
-FBOW_DIR = str(ROOTDIR/'SFM/vocab/orb_mur.fbow')
-BASE_DIR = str(DATA_DIR/'test')
+FBOW_PATH = str(ROOTDIR/'SFM/vocab/orb_mur.fbow')
+
 FEATURE_PATH = str(DATA_DIR/'test/map.yaml')
 IMAGE_DIR = str(DATA_DIR/'test/images')
-SCENE_DIR = str(DATA_DIR/'test/scene')
-SCENE_PATH = str(DATA_DIR/'test/scene/scene.mvs')
+SCENE_PATH = str(SCENE_DIR/'scene.mvs')
 
 
 logger = logging.getLogger('WebSFM')
@@ -43,6 +44,7 @@ pcs = set()
 relay = MediaRelay()
 
 ######################################################################################################################################################
+
 def reset_dir():
   if os.path.exists(BASE_DIR):
     shutil.rmtree(BASE_DIR)
@@ -79,7 +81,7 @@ class SlamTrack(MediaStreamTrack):
         self.session.release()
         if self.params['mode'] == 'slam_save':
           logger.info('start mvs reconstruct')
-          MVS(MVS_BIN, BASE_DIR).generate(SCENE_PATH)
+          MVS_PIPE.add_task(SCENE_PATH)
 
       elif msg == 'switch':
         self.frame = 'map' if self.frame == 'orb' else 'orb'
@@ -99,7 +101,7 @@ class SlamTrack(MediaStreamTrack):
     img = self.session.get_map_visual() if self.frame == 'map' else self.session.get_orb_visual()
     if img.size > 0: new_frame = VideoFrame.from_ndarray(img, format='bgr24')
     # push position
-    position = self.session.get_position()
+    position = self.session.get_position_gl()
     state = self.session.tracking_state()
     
     try:
@@ -118,6 +120,14 @@ class SlamTrack(MediaStreamTrack):
 # webrtc session handler
 async def session_handler(request):
   params = await request.json()
+
+  if params['mode'] == 'slam_save':
+    if os.path.exists(str(SCENE_DIR/'status.log')):
+      with open(str(SCENE_DIR/'status.log'), 'r') as f :
+        status = int(f.read())
+        if status != -1 and status != 3:
+          return web.json_response({'status': status, 'msg' : 'mvs is running'})
+
   offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
 
   pc = RTCPeerConnection() 
@@ -131,7 +141,7 @@ async def session_handler(request):
   if params['mode'] == 'slam_save': 
     reset_dir()
     
-  session = pysfm.Session(FBOW_DIR, 640, 480, True, IMAGE_DIR)
+  session = pysfm.Session(FBOW_PATH, 640, 480, True, IMAGE_DIR)
   session.enable_viewer()
   
   if params['mode'] == 'slam_save': 
@@ -195,6 +205,7 @@ async def session_handler(request):
 
 # close all rtc connection when shut down
 async def on_shutdown(app):
+  MVS_PIPE.release()
   # close peer connections
   coros = [pc.close() for pc in pcs]
   await asyncio.gather(*coros)

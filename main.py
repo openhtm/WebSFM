@@ -4,7 +4,7 @@ import argparse
 # web application
 from aiohttp import web
 # handler
-from handler.session import session_handler, on_shutdown
+from handler.session import session_handler, on_shutdown, MVS_PIPE
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="WebRTC-SLAM API Server")
@@ -28,6 +28,8 @@ if __name__ == "__main__":
   app.on_shutdown.append(on_shutdown)
   app.router.add_post('/session', session_handler)
   app.router.add_static('/static', './static')
+
+  MVS_PIPE.start()
   
   web.run_app(
     app, access_log=None, host=args.host, port=args.port, ssl_context=ssl_context,

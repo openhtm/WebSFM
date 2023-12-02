@@ -1,19 +1,65 @@
 from pathlib import Path
 import subprocess
+from multiprocessing import Process, Queue
 import os
+import logging
 import shutil
 
+logger = logging.getLogger('MVSPipe')
+
+class MVSPipe(Process):
+  tasks = Queue()
+  exit_required = False
+
+  def __init__(self, mvs_path):
+    super().__init__()
+    self.mvs_path = Path(mvs_path)
+  
+  def run(self):
+    logger.info('Pipe is running, waiting for new task.')
+
+    while not self.exit_required:
+      task = self.tasks.get()
+      if task is None:
+        break
+
+      logger.info('new task received')
+      if isinstance(task, MVS):
+        logger.info(f'running mvs task {task.scene}')
+        task.generate()
+
+  def add_task(self, scene):
+    if self.exit_required:
+      logger.error('mvs pipe is closed')
+      return
+    
+    task = MVS(self.mvs_path, scene)
+    self.tasks.put(task)
+    logger.info(f'task {scene} added')
+
+  def release(self):
+    logger.info('Pipe will be release')
+    self.tasks.put(None)
+    self.exit_required = True
+
+  def terminate(self):
+    logger.info('Pipe terminated')
+    self.exit_required = True
+    super().terminate()
+
+
 class MVS:
-  def __init__(self, mvs_path, log_dir):
+  def __init__(self, mvs_path, scene):
     self.mvs_path = Path(mvs_path)
     
-    self.cmd_densify = str(mvs_path/'DensifyPointCloud')
-    self.cmd_reconstruct = str(mvs_path/'ReconstructMesh')
-    self.cmd_texture = str(mvs_path/'TextureMesh')
+    self.cmd_densify = str(self.mvs_path/'DensifyPointCloud')
+    self.cmd_reconstruct = str(self.mvs_path/'ReconstructMesh')
+    self.cmd_texture = str(self.mvs_path/'TextureMesh')
 
     self.code = 0
+    self.scene = Path(scene)
 
-    self.log_path = Path(log_dir) / 'mvs.log'
+    self.log_path = Path(scene).parent / 'status.log'
     self.log(0)
 
   def log(self, code):
@@ -60,7 +106,9 @@ class MVS:
       self.log(3)
     return code == 0
 
-  def generate(self, scene):
+  def generate(self, scene_path = None, cache = False):
+    scene = scene_path if scene_path else self.scene
+
     base = Path(scene).parent
     tmp = base/'tmp'
 
@@ -74,10 +122,17 @@ class MVS:
     mesh = base/'mesh.mvs'
     texture = base/'texture.mvs'
 
+    logger.info(f'mvs generating for {scene}')
+
     if self.densify_pcl(scene, dense):
       if self.reconstruct_mesh(dense, mesh):
         if self.texture_mesh(mesh, texture):
           pass
+    
+    if not cache:
+      for filename in os.listdir(tmp):
+        if filename.endswith('.dmap'):
+          os.remove(tmp/filename)
 
     return self.code
 
