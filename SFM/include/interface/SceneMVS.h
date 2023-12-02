@@ -12,7 +12,7 @@ public:
   // constructor
   Scene(ORB_SLAM2::System& system);
   // serialize
-  void serialize(const std::string& filename);
+  void serialize(const std::string& filename, bool convert_cv2gl = true);
 
 protected:
   // define platforms with camera intrinsic
@@ -37,6 +37,9 @@ protected:
   // Slam SFM system
   ORB_SLAM2::System &system_;
   ORB_SLAM2::Map &map_;
+
+  // coordinate convert
+  bool convert_cv2gl_ = true;
 
 };
 

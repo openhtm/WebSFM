@@ -5,13 +5,28 @@
 
 namespace MVS {
 
+const Eigen::Matrix4d COORD_TWC_CV2GL_ = 
+  (Eigen::Matrix4d() << 
+    1, 0, 0, 0,
+    0, -1, 0, 0,
+    0, 0, -1, 0,
+    0, 0, 0, 1).finished();
+
+const Eigen::Matrix3d COORD_RWC_CV2GL_ = 
+  (Eigen::Matrix3d() << 
+    1, 0, 0,
+    0, -1, 0,
+    0, 0, -1).finished();
+
 Scene::Scene(ORB_SLAM2::System& system) 
   : system_(system), map_(*system.map_)
 {
   // initialize  
 }
 
-void Scene::serialize(const std::string& filename) {
+void Scene::serialize(const std::string& filename, bool convert_cv2gl) {
+  // set convert flag
+  convert_cv2gl_ = convert_cv2gl;
   // bind keyframe id
   bindKeyframeID();
   // set platform
@@ -94,13 +109,19 @@ void Scene::defineImagePose() {
     // pose
     _INTERFACE_NAMESPACE::Interface::Platform::Pose pose;
     image.poseID = platform.poses.size();
+
     // rotation
     auto rcw = pKF->GetRotation();
-    // Eigen::Matrix3d rwc = rcw.transpose();
+    if(convert_cv2gl_) 
+      rcw = COORD_RWC_CV2GL_ * rcw;
     cv::eigen2cv(rcw, pose.R);
+
     // center (translation)
     auto t = pKF->GetCameraCenter();
-    pose.C = cv::Point3d(t(0), t(1), t(2));
+    if(convert_cv2gl_) 
+      pose.C = cv::Point3d(t(0), -t(1), -t(2));
+    else
+      pose.C = cv::Point3d(t(0), t(1), t(2));
 
     platform.poses.push_back(pose);
     scene_.images.emplace_back(image);
@@ -147,7 +168,10 @@ void Scene::defineStructure() {
 
     // set 3D position
     auto p = pMP->GetWorldPos();
-    vert.X = cv::Point3f(p(0), p(1), p(2)); 
+    if(convert_cv2gl_) 
+      vert.X = cv::Point3f(p(0), -p(1), -p(2));
+    else
+      vert.X = cv::Point3f(p(0), p(1), p(2));
 
     scene_.vertices.emplace_back(vert);
   }

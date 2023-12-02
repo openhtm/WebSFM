@@ -5,6 +5,13 @@
 #include <filesystem>
 #include <set>
 
+const Eigen::Matrix4d COORD_CV2GL_ = 
+  (Eigen::Matrix4d() << 
+    1, 0, 0, 0,
+    0, -1, 0, 0,
+    0, 0, -1, 0,
+    0, 0, 0, 1).finished();
+
 /************************************
  * Image stream for realtime process
  ************************************/
@@ -135,10 +142,19 @@ py::array_t<size_t> Session::getTrackingState() {
 }
 
 // get camera twc
-Eigen::Matrix4d Session::getCameraPoseMatrix() {
+Eigen::Matrix4d Session::getTwc() {
   if(released_) return Eigen::Matrix4d::Identity();
 
   Eigen::Matrix4d Twc = psystem_->GetTwc();
+  return Twc;
+}
+
+// get camera twc under openGL coordinate
+Eigen::Matrix4d Session::getTwcGL() {
+  if(released_) return Eigen::Matrix4d::Identity();
+
+  Eigen::Matrix4d Twc = psystem_->GetTwc();
+  Twc = COORD_CV2GL_ * Twc;
   return Twc;
 }
 

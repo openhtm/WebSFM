@@ -51,12 +51,9 @@ public:
   Session(const std::string voc_file, const int imwidth, const int imheight,
     bool force_realtime, const std::string keyframe_dir);
 
-
 public:
   // add new image frame
   void addTrack(py::array_t<uint8_t>& input, double time_ms = -1);
-  // // get feature points
-  // py::array_t<float> getFeatures();
   // get current map
   py::array_t<uint8_t> getMapVisualFrame();
   // get current orb feature
@@ -64,9 +61,9 @@ public:
   // get tracking status
   py::array_t<size_t> getTrackingState();
   // get camera twc
-  Eigen::Matrix4d getCameraPoseMatrix();
-  // remove redundant
-  void removeRedundant();
+  Eigen::Matrix4d getTwc();
+  // get camera twc under openGL coordinate
+  Eigen::Matrix4d getTwcGL();
   // set map save status
   void setSaveMap(bool save_map, const std::string map_name);
   // load map
@@ -85,6 +82,8 @@ private:
   void run();
   // get image from webrtc frame
   cv::Mat getImageBGR(py::array_t<uint8_t>& input);
+  // remove redundant images
+  void removeRedundant();
 
   bool released_ = false;
 	bool visualize_ = false;
@@ -118,7 +117,8 @@ PYBIND11_MODULE(pysfm, m) {
     .def("enable_viewer", &Session::enableViewer, py::arg("off_screen") = true)
     .def("add_track", &Session::addTrack, py::arg("image"), py::arg("time_ms") = -1)
     .def("tracking_state", &Session::getTrackingState)
-    .def("get_position", &Session::getCameraPoseMatrix)
+    .def("get_position_cv", &Session::getTwc)
+    .def("get_position_gl", &Session::getTwcGL)
     .def("get_map_visual", &Session::getMapVisualFrame)
     .def("get_orb_visual", &Session::getOrbVisualFrame)
     .def("save_map", &Session::setSaveMap, py::arg("save_map"), py::arg("map_name") = "")
