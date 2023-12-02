@@ -593,7 +593,7 @@ void LocalMapping::KeyFrameCulling() {
                                    vend = vpLocalKeyFrames.end();
        vit != vend; vit++) {
     KeyFrame* keyframe = *vit;
-    if (keyframe->id_ == 0) continue;
+    if (!keyframe || keyframe->id_ == 0) continue;
     const vector<MapPoint*> map_points = keyframe->GetMapPointMatches();
 
     int n_observations = 3;

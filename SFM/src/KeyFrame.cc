@@ -180,11 +180,10 @@ void KeyFrame::UpdateBestCovisibles() {
   std::lock_guard<std::mutex> lock(mutex_connections_);
   vector<std::pair<int, KeyFrame*> > pairs;
   pairs.reserve(connected_keyframe_weights_.size());
-  for (std::map<KeyFrame*, int>::iterator
-           mit = connected_keyframe_weights_.begin(),
-           mend = connected_keyframe_weights_.end();
-       mit != mend; mit++)
-    pairs.push_back(std::make_pair(mit->second, mit->first));
+  for (auto& it : connected_keyframe_weights_) {
+    pairs.push_back(std::make_pair(it.second, it.first));
+  }
+    
 
   sort(pairs.begin(), pairs.end());
   list<KeyFrame*> keyframe_list;
@@ -202,9 +201,8 @@ void KeyFrame::UpdateBestCovisibles() {
 set<KeyFrame*> KeyFrame::GetConnectedKeyFrames() {
   std::lock_guard<std::mutex> lock(mutex_connections_);
   set<KeyFrame*> keyframe_set;
-  for (map<KeyFrame*, int>::iterator mit = connected_keyframe_weights_.begin();
-       mit != connected_keyframe_weights_.end(); mit++)
-    keyframe_set.insert(mit->first);
+  for (auto& it : connected_keyframe_weights_)
+    keyframe_set.insert(it.first);
   return keyframe_set;
 }
 
@@ -330,27 +328,24 @@ void KeyFrame::UpdateConnections() {
 
   // For all map points in keyframe check in which other keyframes are they seen
   // Increase counter for those keyframes
-  for (vector<MapPoint*>::iterator vit = map_points.begin(),
-                                   vend = map_points.end();
-       vit != vend; vit++) {
-    MapPoint* map_point = *vit;
-
+  for (auto& map_point : map_points) {
     if (!map_point) continue;
 
     if (map_point->isBad()) continue;
 
     std::map<KeyFrame*, size_t> observations = map_point->GetObservations();
 
-    for (map<KeyFrame*, size_t>::iterator mit = observations.begin(),
-                                          mend = observations.end();
-         mit != mend; mit++) {
-      if (mit->first->id_ == id_) continue;
-      keyframe_counter[mit->first]++;
+    for (auto& it : observations) {
+      if (it.first->id_ == id_) continue;
+      keyframe_counter[it.first]++;
     }
   }
 
   // This should not happen
-  if (keyframe_counter.empty()) return;
+  if (keyframe_counter.empty()){
+    spdlog::warn("no keyframe is observed by this keyframe");
+    return;
+  }
 
   // If the counter is greater than threshold add connection
   // In case no keyframe counter is over threshold add the one with maximum
@@ -361,16 +356,14 @@ void KeyFrame::UpdateConnections() {
 
   vector<std::pair<int, KeyFrame*> > pairs;
   pairs.reserve(keyframe_counter.size());
-  for (map<KeyFrame*, int>::iterator mit = keyframe_counter.begin(),
-                                     mend = keyframe_counter.end();
-       mit != mend; mit++) {
-    if (mit->second > nmax) {
-      nmax = mit->second;
-      keyframe_max = mit->first;
+  for (auto& it : keyframe_counter) {
+    if (it.second > nmax) {
+      nmax = it.second;
+      keyframe_max = it.first;
     }
-    if (mit->second >= th) {
-      pairs.push_back(make_pair(mit->second, mit->first));
-      (mit->first)->AddConnection(this, mit->second);
+    if (it.second >= th) {
+      pairs.push_back(make_pair(it.second, it.first));
+      (it.first)->AddConnection(this, it.second);
     }
   }
 
@@ -406,6 +399,13 @@ void KeyFrame::UpdateConnections() {
 }
 
 void KeyFrame::AddChild(KeyFrame* keyframe) {
+  if(!keyframe) return;
+
+  if(keyframe == this) {
+    spdlog::warn("weird, add child to itself");
+    return;
+  }
+
   {
     std::lock_guard<std::mutex> lockCon(mutex_connections_);
     childrens_.insert(keyframe);
@@ -418,16 +418,18 @@ void KeyFrame::EraseChild(KeyFrame* keyframe) {
 }
 
 void KeyFrame::ChangeParent(KeyFrame* keyframe) {
-  if(keyframe == this) 
+  if(keyframe == this) {
     spdlog::warn("weird, set parent to itself");
-  
+    keyframe = nullptr;
+  }
+
   {
     std::lock_guard<std::mutex> lockCon(mutex_connections_);
     parent_ = keyframe;
     childrens_.erase(keyframe);
   }
 
-  if(keyframe != this) keyframe->AddChild(this);
+  if(keyframe && keyframe != this) keyframe->AddChild(this);
 }
 
 set<KeyFrame*> KeyFrame::GetChilds() {
@@ -441,11 +443,15 @@ KeyFrame* KeyFrame::GetParent() {
 }
 
 bool KeyFrame::hasChild(KeyFrame* keyframe) {
+  if(!keyframe) return false;
+
   std::lock_guard<std::mutex> lockCon(mutex_connections_);
   return childrens_.count(keyframe);
 }
 
 void KeyFrame::AddLoopEdge(KeyFrame* keyframe) {
+  if(!keyframe) return;
+  
   std::lock_guard<std::mutex> lockCon(mutex_connections_);
   do_not_erase_ = true;
   loop_edges_.insert(keyframe);
@@ -485,11 +491,8 @@ void KeyFrame::SetBadFlag() {
     }
   }
 
-  for (std::map<KeyFrame*, int>::iterator
-           mit = connected_keyframe_weights_.begin(),
-           mend = connected_keyframe_weights_.end();
-       mit != mend; mit++) {
-    mit->first->EraseConnection(this);
+  for (auto& connected : connected_keyframe_weights_){
+    connected.first->EraseConnection(this);
   }
 
   for (size_t i = 0; i < map_points_.size(); i++) {
@@ -517,20 +520,15 @@ void KeyFrame::SetBadFlag() {
       KeyFrame* child;
       KeyFrame* parent;
 
-      for (set<KeyFrame*>::iterator sit = childrens_.begin(),
-                                    send = childrens_.end();
-           sit != send; sit++) {
-        KeyFrame* keyframe = *sit;
+      for (auto& keyframe : childrens_) {
         if (keyframe->isBad()) continue;
 
         // Check if a parent candidate is connected to the keyframe
-        vector<KeyFrame*> connected_keyframes =
-            keyframe->GetVectorCovisibleKeyFrames();
+        auto connected_keyframes = keyframe->GetVectorCovisibleKeyFrames();
+        
         for (size_t i = 0, iend = connected_keyframes.size(); i < iend; i++) {
-          for (std::set<KeyFrame*>::iterator spcit = parent_candidates.begin(),
-                                             spcend = parent_candidates.end();
-               spcit != spcend; spcit++) {
-            if (connected_keyframes[i]->id_ == (*spcit)->id_) {
+          for(auto& candidate : parent_candidates) {
+            if(candidate->id_ == connected_keyframes[i]->id_) {
               int w = keyframe->GetWeight(connected_keyframes[i]);
               if (w > max) {
                 child = keyframe;
@@ -555,13 +553,14 @@ void KeyFrame::SetBadFlag() {
     // If a children has no covisibility links with any parent candidate, assign
     // to the original parent of this KF
     if (!childrens_.empty())
-      for (std::set<KeyFrame*>::iterator sit = childrens_.begin();
-           sit != childrens_.end(); sit++) {
-        (*sit)->ChangeParent(parent_);
-      }
+      for (auto& it : childrens_) 
+        it->ChangeParent(parent_);
 
-    parent_->EraseChild(this);
-    Tcp_ = Tcw_ * parent_->GetPoseInverse();
+    if(parent_) {
+      parent_->EraseChild(this);
+      Tcp_ = Tcw_ * parent_->GetPoseInverse();
+    }
+    
     is_bad_ = true;
   }
 

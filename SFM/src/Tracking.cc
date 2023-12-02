@@ -576,6 +576,11 @@ void Tracking::CreateInitialMapMonocular() {
   // Update Connections
   init_keyframe->UpdateConnections();
   current_keyframe->UpdateConnections();
+  /****************************************
+   * reset parent of the first keyframe 
+   * to nullptr to avoid dead lock
+   ****************************************/
+  init_keyframe->ChangeParent(nullptr);
 
   // Bundle Adjustment
   spdlog::info("New Map created with {} points", map_->MapPointsInMap());
