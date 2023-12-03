@@ -336,7 +336,8 @@ void KeyFrame::UpdateConnections() {
     std::map<KeyFrame*, size_t> observations = map_point->GetObservations();
 
     for (auto& it : observations) {
-      if (it.first->id_ == id_) continue;
+      if (!it.first || it.first->id_ == id_)
+        continue;
       keyframe_counter[it.first]++;
     }
   }
@@ -492,7 +493,8 @@ void KeyFrame::SetBadFlag() {
   }
 
   for (auto& connected : connected_keyframe_weights_){
-    connected.first->EraseConnection(this);
+    if(connected.first)
+      connected.first->EraseConnection(this);
   }
 
   for (size_t i = 0; i < map_points_.size(); i++) {
@@ -508,7 +510,8 @@ void KeyFrame::SetBadFlag() {
 
     // Update Spanning Tree
     set<KeyFrame*> parent_candidates;
-    parent_candidates.insert(parent_);
+    if(parent_)
+      parent_candidates.insert(parent_);
 
     // Assign at each iteration one children with a parent (the pair with
     // highest covisibility weight) Include that children as new parent
@@ -517,11 +520,11 @@ void KeyFrame::SetBadFlag() {
       bool do_continue = false;
 
       int max = -1;
-      KeyFrame* child;
-      KeyFrame* parent;
+      KeyFrame* child = nullptr;
+      KeyFrame* parent = nullptr;
 
       for (auto& keyframe : childrens_) {
-        if (keyframe->isBad()) continue;
+        if (!keyframe || keyframe->isBad()) continue;
 
         // Check if a parent candidate is connected to the keyframe
         auto connected_keyframes = keyframe->GetVectorCovisibleKeyFrames();

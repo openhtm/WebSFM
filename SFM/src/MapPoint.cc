@@ -215,17 +215,16 @@ void MapPoint::Replace(MapPoint* map_point) {
     replaced_map_point_ = map_point;
   }
 
-  for (map<KeyFrame*, size_t>::iterator mit = observations.begin(),
-                                        mend = observations.end();
-       mit != mend; mit++) {
+  for (auto& it : observations) {
     // Replace measurement in keyframe
-    KeyFrame* keyframe = mit->first;
+    KeyFrame* keyframe = it.first;
+    if(!keyframe) continue;
 
     if (!map_point->IsInKeyFrame(keyframe)) {
-      keyframe->ReplaceMapPointMatch(mit->second, map_point);
-      map_point->AddObservation(keyframe, mit->second);
+      keyframe->ReplaceMapPointMatch(it.second, map_point);
+      map_point->AddObservation(keyframe, it.second);
     } else {
-      keyframe->EraseMapPointMatch(mit->second);
+      keyframe->EraseMapPointMatch(it.second);
     }
   }
   map_point->IncreaseFound(nfound);

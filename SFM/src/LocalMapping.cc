@@ -586,15 +586,13 @@ void LocalMapping::KeyFrameCulling() {
   // A keyframe is considered redundant if the 90% of the MapPoints it sees, are
   // seen in at least other 3 keyframes (in the same or finer scale) We only
   // consider close stereo points
-  vector<KeyFrame*> vpLocalKeyFrames =
-      current_keyframe_->GetVectorCovisibleKeyFrames();
+  vector<KeyFrame*> vpLocalKeyFrames = current_keyframe_->GetVectorCovisibleKeyFrames();
 
-  for (vector<KeyFrame*>::iterator vit = vpLocalKeyFrames.begin(),
-                                   vend = vpLocalKeyFrames.end();
-       vit != vend; vit++) {
-    KeyFrame* keyframe = *vit;
-    if (!keyframe || keyframe->id_ == 0) continue;
-    const vector<MapPoint*> map_points = keyframe->GetMapPointMatches();
+  for (auto& keyframe : vpLocalKeyFrames) {
+    if (!keyframe || keyframe->id_ == 0)
+      continue;
+    
+    const auto map_points = keyframe->GetMapPointMatches();
 
     int n_observations = 3;
     const int thObs = n_observations;
@@ -602,43 +600,36 @@ void LocalMapping::KeyFrameCulling() {
     int n_map_points = 0;
     for (size_t i = 0, iend = map_points.size(); i < iend; i++) {
       MapPoint* map_point = map_points[i];
-      if (map_point) {
-        if (!map_point->isBad()) {
-          if (!is_monocular_) {
-            if (keyframe->depthes_[i] > keyframe->threshold_depth_ ||
-                keyframe->depthes_[i] < 0)
+      if (map_point && !map_point->isBad()) {
+        if (!is_monocular_)
+          if (keyframe->depthes_[i] > keyframe->threshold_depth_ || keyframe->depthes_[i] < 0)
+            continue;
+
+        n_map_points++;
+        if (map_point->Observations() > thObs) {
+          const int& scaleLevel = keyframe->undistort_keypoints_[i].octave;
+          const map<KeyFrame*, size_t> observations = map_point->GetObservations();
+          int n_observations = 0;
+          for (auto& it : observations) {
+            KeyFrame* neighbor_keyframe = it.first;
+            if (!neighbor_keyframe || neighbor_keyframe == keyframe)
               continue;
-          }
+            
+            const int& scaleLeveli = neighbor_keyframe->undistort_keypoints_[it.second].octave;
 
-          n_map_points++;
-          if (map_point->Observations() > thObs) {
-            const int& scaleLevel = keyframe->undistort_keypoints_[i].octave;
-            const map<KeyFrame*, size_t> observations =
-                map_point->GetObservations();
-            int n_observations = 0;
-            for (map<KeyFrame*, size_t>::const_iterator
-                     mit = observations.begin(),
-                     mend = observations.end();
-                 mit != mend; mit++) {
-              KeyFrame* neighbor_keyframe = mit->first;
-              if (neighbor_keyframe == keyframe) continue;
-              const int& scaleLeveli =
-                  neighbor_keyframe->undistort_keypoints_[mit->second].octave;
-
-              if (scaleLeveli <= scaleLevel + 1) {
-                n_observations++;
-                if (n_observations >= thObs) break;
-              }
-            }
-            if (n_observations >= thObs) {
-              nRedundantObservations++;
+            if (scaleLeveli <= scaleLevel + 1) {
+              n_observations++;
+              if(n_observations >= thObs)
+                break;
             }
           }
+          if (n_observations >= thObs)
+            nRedundantObservations++;
         }
       }
     }
 
-    if (nRedundantObservations > 0.9 * n_map_points) {
+    if (nRedundantObservations > 0.95 * n_map_points) {
       keyframe->SetBadFlag();
     }
   }
