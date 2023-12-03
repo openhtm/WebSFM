@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <set>
 
-const Eigen::Matrix4d COORD_CV2GL_ = 
+const Eigen::Matrix4d MAT_X44D_CV2GL_ = 
   (Eigen::Matrix4d() << 
     1, 0, 0, 0,
     0, -1, 0, 0,
@@ -154,7 +154,7 @@ Eigen::Matrix4d Session::getTwcGL() {
   if(released_) return Eigen::Matrix4d::Identity();
 
   Eigen::Matrix4d Twc = psystem_->GetTwc();
-  Twc = COORD_CV2GL_ * Twc;
+  Twc = MAT_X44D_CV2GL_ * Twc;
   return Twc;
 }
 

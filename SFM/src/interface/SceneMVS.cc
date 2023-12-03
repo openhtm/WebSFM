@@ -5,18 +5,15 @@
 
 namespace MVS {
 
-const Eigen::Matrix4d COORD_TWC_CV2GL_ = 
-  (Eigen::Matrix4d() << 
-    1, 0, 0, 0,
-    0, -1, 0, 0,
-    0, 0, -1, 0,
-    0, 0, 0, 1).finished();
-
-const Eigen::Matrix3d COORD_RWC_CV2GL_ = 
+const Eigen::Matrix3d MAT_X33D_CV2GL_ = 
   (Eigen::Matrix3d() << 
     1, 0, 0,
     0, -1, 0,
     0, 0, -1).finished();
+
+const Eigen::Matrix3d MAT_X33D_CV2GL_INVERSE_
+   = MAT_X33D_CV2GL_;
+
 
 Scene::Scene(ORB_SLAM2::System& system) 
   : system_(system), map_(*system.map_)
@@ -113,7 +110,7 @@ void Scene::defineImagePose() {
     // rotation
     auto rcw = pKF->GetRotation();
     if(convert_cv2gl_) 
-      rcw = COORD_RWC_CV2GL_ * rcw;
+      rcw = rcw * MAT_X33D_CV2GL_INVERSE_;
     cv::eigen2cv(rcw, pose.R);
 
     // center (translation)
