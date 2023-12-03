@@ -35,7 +35,6 @@ class MVSPipe(Process):
     
     task = MVS(self.mvs_path, scene)
     self.tasks.put(task)
-    logger.info(f'task {scene} added')
 
   def release(self):
     logger.info('Pipe will be release')
@@ -86,26 +85,45 @@ class MVS:
     return p.returncode, str(p.stdout.read())
 
   def densify_pcl(self, input_, output_):
-    code, msg = self.command(self.cmd_densify, input_, output_)
-    if code == 0:
-      print('successfully densified')
-      self.log(1)
-    return code == 0
-  
-  def reconstruct_mesh(self, input_, output_):
-    code, msg = self.command(self.cmd_reconstruct, input_, output_)
-    if code == 0:
-      print('successfully reconstructed')
-      self.log(2)
-    return code == 0
-  
-  def texture_mesh(self, input_, output_):
-    code, msg = self.command(self.cmd_texture, input_, output_)
-    if code == 0:
-      print('successfully textured')
-      self.log(3)
-    return code == 0
+    if self.code == -1:
+      return False
 
+    err, msg = self.command(self.cmd_densify, input_, output_)
+    if not err:
+      logger.info('successfully densified')
+      self.log(1)
+    else:
+      logger.error('error occured while densifying')
+    return err == 0
+  
+  # reconstruct mesh from dense pointclouds
+  def reconstruct_mesh(self, input_, output_):
+    if self.code == -1:
+      return False
+
+    err, msg = self.command(self.cmd_reconstruct, input_, output_)
+    if not err:
+      logger.info('successfully reconstructed')
+      self.log(2)
+    else:
+      logger.error('error occured while reconstructing')
+    return err == 0
+  
+  # texture mesh from raw mesh
+  def texture_mesh(self, input_, output_):
+    if self.code == -1:
+      return False
+
+    err, msg = self.command(self.cmd_texture, input_, output_)
+    if not err:
+      logger.info('successfully textured')
+      self.log(3)
+    else:
+      logger.error('error occured while texturing')
+    return err == 0
+
+
+  # main generate function
   def generate(self, scene_path = None, cache = False):
     scene = scene_path if scene_path else self.scene
 
@@ -122,12 +140,9 @@ class MVS:
     mesh = base/'mesh.mvs'
     texture = base/'texture.mvs'
 
-    logger.info(f'mvs generating for {scene}')
+    logger.info(f'generating for {scene}')
 
-    if self.densify_pcl(scene, dense):
-      if self.reconstruct_mesh(dense, mesh):
-        if self.texture_mesh(mesh, texture):
-          pass
+    res = self.densify_pcl(scene, dense) and self.reconstruct_mesh(dense, mesh) and self.texture_mesh(mesh, texture)    
     
     if not cache:
       for filename in os.listdir(tmp):
