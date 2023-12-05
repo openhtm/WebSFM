@@ -28,15 +28,8 @@ from SFM.mvs import MVSPipe
 MVS_PIPE = MVSPipe(Path('/usr/local/bin/OpenMVS'))
 
 ROOTDIR = Path(__file__).parent.parent
-DATA_DIR = ROOTDIR/'static/usr'
-BASE_DIR = DATA_DIR/'test'
-SCENE_DIR = BASE_DIR/'scene'
-
+USR_DIR = ROOTDIR/'static/usr'
 FBOW_PATH = str(ROOTDIR/'SFM/vocab/orb_mur.fbow')
-
-FEATURE_PATH = str(DATA_DIR/'test/map.yaml')
-IMAGE_DIR = str(DATA_DIR/'test/images')
-SCENE_PATH = str(SCENE_DIR/'scene.mvs')
 
 
 logger = logging.getLogger('WebSFM')
@@ -44,13 +37,13 @@ pcs = set()
 relay = MediaRelay()
 
 ######################################################################################################################################################
-
-def reset_dir():
-  if os.path.exists(BASE_DIR):
-    shutil.rmtree(BASE_DIR)
-  os.mkdir(BASE_DIR)
-  os.mkdir(IMAGE_DIR)
-  os.mkdir(SCENE_DIR)
+def init_dir(id):
+  folder = str(USR_DIR/str(id))
+  if os.path.exists(folder):
+    shutil.rmtree(folder)
+  os.mkdir(folder)
+  os.mkdir(str(USR_DIR/str(id)/'images'))
+  os.mkdir(str(USR_DIR/str(id)/'scene'))
 
 ######################################################################################################################################################
 # encode numpy.ndarray to json
@@ -62,53 +55,78 @@ class NumpyArrayEncoder(json.JSONEncoder):
 
 
 ######################################################################################################################################################
+BlankFrame = VideoFrame.from_ndarray(np.zeros((480, 640, 3), np.uint8), format='rgb24')
 # webrtc frame track handler
-class SlamTrack(MediaStreamTrack):
+class SfmTrack(MediaStreamTrack):
   kind = 'video'
-  frame = 'map'
 
-  def __init__(self, track, session, channels, params):
+  def __init__(self, session_id, create_mode, channels):
     super().__init__()  # don't forget this!
-    self.track = track
-    self.session = session
+    self.session_id = session_id
+    self.track = None
     self.channels = channels
-    self.params = params
-    self.blank = VideoFrame.from_ndarray(np.zeros((480, 640, 3), np.uint8), format='rgb24')
+    self.frame2d = True
+    self.create_mode = create_mode
+    self.released = False
+    self.folder = USR_DIR/str(self.session_id)
+
+    # init session
+    self.create_session()
 
     # set channel
     def on_message(msg):
-      if msg == 'release':
-        self.session.release()
-        if self.params['mode'] == 'slam_save':
-          logger.info('start mvs reconstruct')
-          MVS_PIPE.add_task(SCENE_PATH)
-
-      elif msg == 'switch':
-        self.frame = 'map' if self.frame == 'orb' else 'orb'
-
+      if msg == 'release':  self.release()
+      elif msg == 'switch': self.frame2d = not self.frame2d
     self.channels['signal'].add_listener('message', on_message) 
 
+  def set_track(self,track):
+    self.track = track
 
+  # create websfm session
+  def create_session(self):
+    # create session
+    self.session = pysfm.Session(FBOW_PATH, 640, 480, True, str(self.folder/'images'))
+    self.session.enable_viewer()
+
+    if self.create_mode:
+      init_dir(self.session_id)
+      self.session.save_map(True, str(self.folder/'map.yaml'))
+      self.session.save_mvs(True, str(self.folder/'scene/scene.mvs'))
+    else:
+      self.session.load_map(True, str(self.folder/'map.yaml'))
+  
+  def release(self):
+    if self.released: return
+    self.released = True
+    self.session.release()
+    if self.create_mode: MVS_PIPE.add_task(str(self.folder/'scene/scene.mvs'))   
+
+  def terminate(self):
+    self.session.cancel()
+
+  # recv frame
   async def recv(self):
+    global BlankFrame
     frame = await self.track.recv()
     img = frame.to_ndarray(format='bgr24')
-    new_frame = self.blank
+    new_frame = BlankFrame
 
     # new tracking
     self.session.add_track(img)
 
     # get map frame
-    img = self.session.get_map_visual() if self.frame == 'map' else self.session.get_orb_visual()
+    img = self.session.get_orb_visual() if self.frame2d else self.session.get_map_visual()
     if img.size > 0: new_frame = VideoFrame.from_ndarray(img, format='bgr24')
     # push position
     position = self.session.get_position_gl()
     state = self.session.tracking_state()
     
     try:
-      self.channels['position'].send(json.dumps(position, cls=NumpyArrayEncoder))
-      self.channels['state'].send(json.dumps(state, cls=NumpyArrayEncoder))
+      if not self.released:
+        self.channels['position'].send(json.dumps(position, cls=NumpyArrayEncoder))
+        self.channels['state'].send(json.dumps(state, cls=NumpyArrayEncoder))
     except Exception as e:
-      logger.error(str(e))
+      logger.warn(e)
 
     # push frames
     new_frame.pts = frame.pts
@@ -121,40 +139,19 @@ class SlamTrack(MediaStreamTrack):
 async def session_handler(request):
   params = await request.json()
 
-  if params['mode'] == 'slam_save':
-    if os.path.exists(str(SCENE_DIR/'status.log')):
-      with open(str(SCENE_DIR/'status.log'), 'r') as f :
-        status = int(f.read())
-        if status != -1 and status != 3:
-          return web.json_response({'status': status, 'msg' : 'mvs is running'})
+  if params['create_mode'] and MVS_PIPE.tasks.qsize() > 2:
+    return web.json_response({'status': -1, 'msg' : 'service busy'})
 
   offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
 
   pc = RTCPeerConnection() 
-  pc_id = 'WebRTC-Session(%s)' % uuid.uuid4()
   pcs.add(pc)
 
+  session_id = str(uuid.uuid1())
+  pc_id = 'WebRTC-Session(%s)' % session_id
+  
   def log_info(msg, *args):
     logger.info(pc_id + ' ' + msg, *args)
-  
-  # create slam session ###########################################################################
-  if params['mode'] == 'slam_save': 
-    reset_dir()
-    
-  session = pysfm.Session(FBOW_PATH, 640, 480, True, IMAGE_DIR)
-  session.enable_viewer()
-  
-  if params['mode'] == 'slam_save': 
-    # save orb feature map
-    session.save_map(True, FEATURE_PATH)
-    # save mvs scene
-    session.save_mvs(True, SCENE_PATH)
-
-  elif params['mode'] == 'tracking': 
-    session.load_map(True, FEATURE_PATH)
-  
-  ################################################################################################
-
 
   # create data channel to send position and state
   channels = {
@@ -163,34 +160,30 @@ async def session_handler(request):
     'signal' : pc.createDataChannel('signal')
   }
   channels['signal'].add_listener('message', lambda msg: print(msg))
-  # set channel
+
+  sfm_track = SfmTrack(session_id, params['create_mode'], channels)
+
+  # track images
+  @pc.on('track')
+  def on_track(track):
+    sfm_track.set_track(relay.subscribe(track))
+    pc.addTrack(sfm_track)
+    @track.on('ended')
+    async def on_ended():
+      sfm_track.release()
 
   @pc.on('connectionstatechange')
   async def on_connectionstatechange():
     log_info('Connection state is %s', pc.connectionState)
     if pc.connectionState == 'failed':
-      session.cancel()
+      sfm_track.terminate()
       await pc.close()
       pcs.discard(pc)
 
   # data channel messages
   @pc.on('datachannel')
   def on_datachannel(channel):
-    # print('new channel'channel.label)
     pass
-
-  # track images
-  @pc.on('track')
-  def on_track(track):
-    log_info('Track %s received', track.kind)
-
-    if track.kind == 'video':
-      pc.addTrack(SlamTrack(relay.subscribe(track), session, channels, params))
-
-    @track.on('ended')
-    async def on_ended():
-      log_info('Track %s ended', track.kind)
-      session.release()
 
   # handle offer
   await pc.setRemoteDescription(offer)
