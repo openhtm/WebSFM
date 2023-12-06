@@ -82,6 +82,7 @@ class SfmTrack(MediaStreamTrack):
 
     # set channel
     def on_message(msg):
+      print(msg)
       if msg == 'release':  self.release()
       elif msg == 'cancel': self.terminate()
     self.channels['signal'].add_listener('message', on_message) 
@@ -111,6 +112,8 @@ class SfmTrack(MediaStreamTrack):
 
   # cancel sacnning
   def terminate(self):
+    if self.released: return
+    self.released = True
     logger.warn('session terminated, files about session %s will be removed', self.session_id)
     self.session.cancel()
     # remove folder
@@ -191,7 +194,7 @@ async def session_handler(request):
     pc.addTrack(sfm_track)
     @track.on('ended')
     async def on_ended():
-      sfm_track.terminate()
+      sfm_track.release()
 
   @pc.on('connectionstatechange')
   async def on_connectionstatechange():

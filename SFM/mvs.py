@@ -94,6 +94,7 @@ class MVS:
       self.log(1)
     else:
       logger.error('error occured while densifying')
+      self.log(-1)
     return err == 0
   
   # reconstruct mesh from dense pointclouds
@@ -107,6 +108,7 @@ class MVS:
       self.log(2)
     else:
       logger.error('error occured while reconstructing')
+      self.log(-2)
     return err == 0
   
   # texture mesh from raw mesh
@@ -120,6 +122,7 @@ class MVS:
       self.log(3)
     else:
       logger.error('error occured while texturing')
+      self.log(-3)
     return err == 0
 
 

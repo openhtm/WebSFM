@@ -27,3 +27,11 @@ def read_yaml(uid):
       return yaml.safe_load(f)
   else:
     return {}
+
+def read_status(uid):
+  if os.path.exists(str(USR_DIR/str(uid)/'scene/status.log')):
+    with open(str(USR_DIR/str(uid)/'scene/status.log'), 'r') as f:
+      status = f.readline()
+      return int(status)
+  else:
+    return -1

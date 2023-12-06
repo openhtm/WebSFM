@@ -259,13 +259,14 @@ void Session::release() {
   cv::destroyAllWindows();
 
   released_ = true;
-  puts("Session Released");
 }
 
 // cancel session
 void Session::cancel() {
   save_map_ = false;
+  save_scene_ = false;
   release();
+  spdlog::warn("Session cancelled");
 }
 
 // run slam thread
