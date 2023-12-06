@@ -8,6 +8,7 @@ av.logging.set_level(av.logging.ERROR)
 import logging
 import ssl
 import uuid
+import time
 import json
 import os
 import shutil
@@ -40,16 +41,16 @@ pcs = set()
 relay = MediaRelay()
 
 ######################################################################################################################################################
-def init_dir(id):
-  folder = str(USR_DIR/str(id))
+def init_dir(uid):
+  folder = str(USR_DIR/str(uid))
   if os.path.exists(folder):
     shutil.rmtree(folder)
   os.mkdir(folder)
-  os.mkdir(str(USR_DIR/str(id)/'images'))
-  os.mkdir(str(USR_DIR/str(id)/'scene'))
+  os.mkdir(str(USR_DIR/str(uid)/'images'))
+  os.mkdir(str(USR_DIR/str(uid)/'scene'))
   # log time
   time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-  write_info(str(id), {'id': str(id), 'time': time_str})
+  write_info(str(uid), {'id': str(uid), 'time': time_str})
 
 ######################################################################################################################################################
 # encode numpy.ndarray to json
