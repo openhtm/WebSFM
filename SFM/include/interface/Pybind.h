@@ -54,6 +54,8 @@ public:
 public:
   // add new image frame
   void addTrack(py::array_t<uint8_t>& input, double time_ms = -1);
+  // get feature points
+  py::array_t<float> getFeaturePoints();
   // get current map
   py::array_t<uint8_t> getMapVisualFrame();
   // get current orb feature
@@ -117,6 +119,7 @@ PYBIND11_MODULE(pysfm, m) {
     .def("enable_viewer", &Session::enableViewer, py::arg("off_screen") = true)
     .def("add_track", &Session::addTrack, py::arg("image"), py::arg("time_ms") = -1)
     .def("tracking_state", &Session::getTrackingState)
+    .def("get_feature_points", &Session::getFeaturePoints)
     .def("get_position_cv", &Session::getTwc)
     .def("get_position_gl", &Session::getTwcGL)
     .def("get_map_visual", &Session::getMapVisualFrame)

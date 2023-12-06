@@ -25,6 +25,9 @@ import numpy as np
 from SFM import pysfm
 from SFM.mvs import MVSPipe
 
+# io tools
+from handler.tools import write_info, read_info
+
 MVS_PIPE = MVSPipe(Path('/usr/local/bin/OpenMVS'))
 
 ROOTDIR = Path(__file__).parent.parent
@@ -44,6 +47,9 @@ def init_dir(id):
   os.mkdir(folder)
   os.mkdir(str(USR_DIR/str(id)/'images'))
   os.mkdir(str(USR_DIR/str(id)/'scene'))
+  # log time
+  time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+  write_info(str(id), {'id': str(id), 'time': time_str})
 
 ######################################################################################################################################################
 # encode numpy.ndarray to json
@@ -76,7 +82,7 @@ class SfmTrack(MediaStreamTrack):
     # set channel
     def on_message(msg):
       if msg == 'release':  self.release()
-      elif msg == 'switch': self.frame2d = not self.frame2d
+      elif msg == 'cancel': self.terminate()
     self.channels['signal'].add_listener('message', on_message) 
 
   def set_track(self,track):
@@ -86,7 +92,7 @@ class SfmTrack(MediaStreamTrack):
   def create_session(self):
     # create session
     self.session = pysfm.Session(FBOW_PATH, 640, 480, True, str(self.folder/'images'))
-    self.session.enable_viewer()
+    self.session.enable_viewer(False)
 
     if self.create_mode:
       init_dir(self.session_id)
@@ -95,14 +101,22 @@ class SfmTrack(MediaStreamTrack):
     else:
       self.session.load_map(True, str(self.folder/'map.yaml'))
   
+  # complete scanning
   def release(self):
     if self.released: return
     self.released = True
     self.session.release()
     if self.create_mode: MVS_PIPE.add_task(str(self.folder/'scene/scene.mvs'))   
 
+  # cancel sacnning
   def terminate(self):
+    logger.warn('session terminated, files about session %s will be removed', self.session_id)
     self.session.cancel()
+    # remove folder
+    folder = str(USR_DIR/str(self.session_id))
+    if os.path.exists(folder):
+      shutil.rmtree(folder)
+
 
   # recv frame
   async def recv(self):
@@ -115,18 +129,24 @@ class SfmTrack(MediaStreamTrack):
     self.session.add_track(img)
 
     # get map frame
-    img = self.session.get_orb_visual() if self.frame2d else self.session.get_map_visual()
+    # img = self.session.get_orb_visual() if self.frame2d else self.session.get_map_visual()
+    img = self.session.get_map_visual()
     if img.size > 0: new_frame = VideoFrame.from_ndarray(img, format='bgr24')
     # push position
     position = self.session.get_position_gl()
+    features = self.session.get_feature_points()
     state = self.session.tracking_state()
-    
-    try:
-      if not self.released:
-        self.channels['position'].send(json.dumps(position, cls=NumpyArrayEncoder))
-        self.channels['state'].send(json.dumps(state, cls=NumpyArrayEncoder))
-    except Exception as e:
-      logger.warn(e)
+
+    # send status
+    if not self.released:
+      try: self.channels['position'].send(json.dumps(position, cls=NumpyArrayEncoder))
+      except Exception as e: logger.warn(e)
+
+      try: self.channels['features'].send(json.dumps(features, cls=NumpyArrayEncoder))
+      except Exception as e: logger.warn(e)
+
+      try: self.channels['state'].send(json.dumps(state, cls=NumpyArrayEncoder))
+      except Exception as e: logger.warn(e)
 
     # push frames
     new_frame.pts = frame.pts
@@ -156,10 +176,10 @@ async def session_handler(request):
   # create data channel to send position and state
   channels = {
     'position' : pc.createDataChannel('position'),
+    'features' : pc.createDataChannel('features'),
     'state' : pc.createDataChannel('state'),
     'signal' : pc.createDataChannel('signal')
   }
-  channels['signal'].add_listener('message', lambda msg: print(msg))
 
   sfm_track = SfmTrack(session_id, params['create_mode'], channels)
 
@@ -170,7 +190,7 @@ async def session_handler(request):
     pc.addTrack(sfm_track)
     @track.on('ended')
     async def on_ended():
-      sfm_track.release()
+      sfm_track.terminate()
 
   @pc.on('connectionstatechange')
   async def on_connectionstatechange():

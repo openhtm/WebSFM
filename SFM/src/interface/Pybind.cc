@@ -100,6 +100,26 @@ void Session::addTrack(py::array_t<uint8_t>& input, double time_ms){
   pstream_->addNewImage(image, time_ms);
 }
 
+// get feature points
+py::array_t<float> Session::getFeaturePoints() {
+  if(released_) 
+    return py::array_t<float>();
+
+  if(!visualize_) {
+    puts("Viewer not enabled!");
+    return py::array_t<float>();
+  }
+
+  std::vector<float> data;
+  auto keypoints = psystem_->GetTrackedKeyPointsUn();
+  for(auto& kp : keypoints) {
+    data.push_back(kp.pt.x);
+    data.push_back(kp.pt.y);
+  }
+
+  return py::array_t<float>({(int)data.size()/2, 2}, data.data());
+}
+
 // get current map
 py::array_t<uint8_t> Session::getMapVisualFrame() {
   if(released_) 
