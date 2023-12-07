@@ -94,7 +94,7 @@ class SfmTrack(MediaStreamTrack):
   def create_session(self):
     # create session
     self.session = pysfm.Session(FBOW_PATH, 640, 480, True, str(self.folder/'images'))
-    self.session.enable_viewer(False)
+    self.session.enable_viewer()
 
     if self.create_mode:
       init_dir(self.session_id)
