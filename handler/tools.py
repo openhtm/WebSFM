@@ -9,19 +9,20 @@ ROOTDIR = Path(__file__).parent.parent
 USR_DIR = ROOTDIR/'static/usr'
 
 def write_info(uid, data):
-  with open(str(USR_DIR/str(uid)/'info.json'), 'w') as f:
-    json.dump(data, f)
-    f.close()
+  if uid is not None:
+    with open(str(USR_DIR/str(uid)/'info.json'), 'w') as f:
+      json.dump(data, f)
+
 
 def read_info(uid):
-  if os.path.exists(str(USR_DIR/str(uid)/'info.json')):
+  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'info.json')):
     with open(str(USR_DIR/str(uid)/'info.json'), 'r') as f:
       return json.load(f)
   else:
     return {}
 
 def read_yaml(uid):
-  if os.path.exists(str(USR_DIR/str(uid)/'map.yaml')):
+  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'map.yaml')):
     with open(str(USR_DIR/str(uid)/'map.yaml'), 'r') as f:
       f.readline()
       return yaml.safe_load(f)
@@ -29,7 +30,7 @@ def read_yaml(uid):
     return {}
 
 def read_status(uid):
-  if os.path.exists(str(USR_DIR/str(uid)/'scene/status.log')):
+  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'scene/status.log')):
     with open(str(USR_DIR/str(uid)/'scene/status.log'), 'r') as f:
       status = f.readline()
       return int(status)

@@ -5,7 +5,7 @@ import argparse
 from aiohttp import web
 # handler
 from handler.session import session_handler, on_shutdown, MVS_PIPE
-from handler.retrieve import query_scenes, remove_scene
+from handler.retrieve import query_scenes, remove_scene, define_base, query_info, define_grid
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="WebRTC-SLAM API Server")
@@ -30,6 +30,9 @@ if __name__ == "__main__":
   app.router.add_post('/session', session_handler)
   app.router.add_get('/retrieve', query_scenes)
   app.router.add_post('/remove', remove_scene)
+  app.router.add_get('/detail', query_info)
+  app.router.add_post('/define', define_base)
+  app.router.add_post('/gridding', define_grid)
   app.router.add_static('/static', './static')
 
   MVS_PIPE.start()
