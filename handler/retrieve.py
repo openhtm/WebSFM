@@ -146,3 +146,31 @@ async def define_grid(request):
       'status': False,
       'msg': str(e)
     })
+
+#define landmarks
+async def define_landmark(request):
+  json_data = await request.json()
+  if 'uid' not in json_data:
+    return web.json_response({
+      'status': False,
+      'msg': 'wrong format'
+    })
+    
+  try:
+    uid = json_data['uid']
+    landmarks = json_data['landmarks']
+
+    info = read_info(uid)
+    info['landmarks'] = landmarks
+    
+    write_info(uid, info)
+    return web.json_response({
+      'status': True,
+      'msg': 'success'
+    })
+
+  except Exception as e:
+    return web.json_response({
+      'status': False,
+      'msg': str(e)
+    })
