@@ -137,10 +137,10 @@ Tracking::Tracking(System* system, ORBVocabulary* vocabulary, Map* map,
   spdlog::info("- Initial Fast Threshold: {}", init_th_FAST);
   spdlog::info("- Minimum Fast Threshold: {}", min_th_FAST);
 
-  if(keyframe_dir_.size() > 0) {
+  if( keyframe_dir_.size() > 0) {
     if(keyframe_dir_[keyframe_dir_.size() - 1] != '/')
       keyframe_dir_ += "/";
-    spdlog::info("keyframe will saved in {}", keyframe_dir_);
+    spdlog::info("keyframe will saved in {} if mapping is activated", keyframe_dir_);
   }
 
 }
@@ -1075,6 +1075,10 @@ void Tracking::UpdateLocalKeyFrames() {
 
 bool Tracking::Relocalization() {
   // LOG(WARNING) << " Relocalization Enter ";
+  if(current_frame_.descriptors_.empty()){
+    spdlog::warn("bad frame: got empty descriptors");
+    return false;
+  }
   // Compute Bag of Words Vector
   current_frame_.ComputeBoW();
 

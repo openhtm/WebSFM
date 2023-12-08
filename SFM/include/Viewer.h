@@ -48,7 +48,7 @@ class System;
 class Viewer {
  public:
   Viewer(System* system, const std::string& string_setting_file);
-  Viewer(System* system);
+  Viewer(System* system, const int view_width, const int view_height);
 
   // Main thread function. Draw points, keyframes, the current camera pose and
   // the last processed frame. Drawing is refreshed according to the camera fps.
@@ -69,7 +69,8 @@ class Viewer {
 
   // 1/fps in ms
   double T_;
-  float img_width_, img_height_;
+  int view_width_;
+  int view_height_;
 
   float view_point_x_, view_point_y_, view_point_z_, view_point_f_;
 

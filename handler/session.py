@@ -67,13 +67,14 @@ BlankFrame = VideoFrame.from_ndarray(np.zeros((480, 640, 3), np.uint8), format='
 class SfmTrack(MediaStreamTrack):
   kind = 'video'
 
-  def __init__(self, session_id, create_mode, channels):
+  def __init__(self, session_id, create_mode, map_id, channels):
     super().__init__()  # don't forget this!
     self.session_id = session_id
     self.track = None
     self.channels = channels
     self.frame2d = True
     self.create_mode = create_mode
+    self.map_id = str(map_id)
     self.released = False
     self.folder = USR_DIR/str(self.session_id)
 
@@ -82,7 +83,6 @@ class SfmTrack(MediaStreamTrack):
 
     # set channel
     def on_message(msg):
-      print(msg)
       if msg == 'release':  self.release()
       elif msg == 'cancel': self.terminate()
     self.channels['signal'].add_listener('message', on_message) 
@@ -93,7 +93,7 @@ class SfmTrack(MediaStreamTrack):
   # create websfm session
   def create_session(self):
     # create session
-    self.session = pysfm.Session(FBOW_PATH, 640, 480, True, str(self.folder/'images'))
+    self.session = pysfm.Session(FBOW_PATH, 640, 480, force_realtime=True, keyframe_dir=str(self.folder/'images'))
     self.session.enable_viewer()
 
     if self.create_mode:
@@ -101,26 +101,30 @@ class SfmTrack(MediaStreamTrack):
       self.session.save_map(True, str(self.folder/'map.yaml'))
       self.session.save_mvs(True, str(self.folder/'scene/scene.mvs'))
     else:
-      self.session.load_map(True, str(self.folder/'map.yaml'))
+      self.session.load_map(str(USR_DIR/self.map_id/'map.yaml'))
+      self.session.activate_localization()
   
   # complete scanning
   def release(self):
     if self.released: return
     self.released = True
     self.session.release()
-    if self.create_mode: MVS_PIPE.add_task(str(self.folder/'scene/scene.mvs'))   
+    # create new scene
+    if self.create_mode: 
+      MVS_PIPE.add_task(str(self.folder/'scene/scene.mvs'))   
 
   # cancel sacnning
   def terminate(self):
     if self.released: return
     self.released = True
-    logger.warn('session terminated, files about session %s will be removed', self.session_id)
+    logger.warn('session terminated')
     self.session.cancel()
-    # remove folder
-    folder = str(USR_DIR/str(self.session_id))
-    if os.path.exists(folder):
-      shutil.rmtree(folder)
-
+    # remove terminate scene
+    if self.create_mode:
+      logger.warn('files about session %s will be removed', self.session_id)
+      # remove folder
+      if os.path.exists(self.folder):
+        shutil.rmtree(self.folder)
 
   # recv frame
   async def recv(self):
@@ -162,9 +166,16 @@ class SfmTrack(MediaStreamTrack):
 # webrtc session handler
 async def session_handler(request):
   params = await request.json()
+  create_mode, map_id = params.get('create_mode', None), params.get('uid', None)
 
-  if params['create_mode'] and MVS_PIPE.tasks.qsize() > 2:
-    return web.json_response({'status': -1, 'msg' : 'service busy'})
+  if create_mode is None or (not create_mode and map_id is None):
+    return web.json_response({'status': False, 'msg' : 'invalid params'})
+
+  if create_mode and MVS_PIPE.tasks.qsize() > 2:
+    return web.json_response({'status': False, 'msg' : 'service busy'})
+
+  if not create_mode and not os.path.exists(str(USR_DIR/str(map_id)/'map.yaml')):
+    return web.json_response({'status': False, 'msg' : 'no such scene'})
 
   offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
 
@@ -185,7 +196,7 @@ async def session_handler(request):
     'signal' : pc.createDataChannel('signal')
   }
 
-  sfm_track = SfmTrack(session_id, params['create_mode'], channels)
+  sfm_track = SfmTrack(session_id, create_mode, map_id, channels)
 
   # track images
   @pc.on('track')
@@ -217,6 +228,7 @@ async def session_handler(request):
   await pc.setLocalDescription(answer)
   
   return web.json_response({
+    'status' : True,
     'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type
   })
 

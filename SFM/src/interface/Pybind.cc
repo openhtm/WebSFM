@@ -205,21 +205,31 @@ void Session::setSaveScene(bool save_scene, const std::string scene_name) {
 }
 
 // load map
-void Session::loadMap(bool track_only, const std::string filename){
+void Session::loadMap(const std::string filename){
   if(released_) return;
 
   posmap_->mapLoad(filename);
   spdlog::info("Map loaded from {}", filename);
+}
 
-  if(track_only) {
-    psystem_->ActivateLocalizationMode();
-    spdlog::info("Localization mode activated");
-  }
+void Session::activateLocalization() {
+  if(released_) return;
+  loc_mode_ = true;
+  psystem_->ActivateLocalizationMode();
+  spdlog::info("Localization mode activated");
+}
+
+void Session::deactivateLocalization() {
+  if(released_) return;
+  loc_mode_ = false;
+  psystem_->DeactivateLocalizationMode();
+  spdlog::info("Localization mode deactivated");
 }
 
 // enable viewer thread
-void Session::enableViewer(bool off_screen) {
-  pviewer_.reset(new ORB_SLAM2::Viewer(psystem_.get()));
+void Session::enableViewer(bool off_screen, int view_width, int view_height) {
+  if(released_) return;
+  pviewer_.reset(new ORB_SLAM2::Viewer(psystem_.get(), view_width, view_height));
   viewer_thread_ = std::thread(&ORB_SLAM2::Viewer::Run, pviewer_, off_screen);
   visualize_ = true;
 }
@@ -238,6 +248,8 @@ void Session::release() {
   psystem_->Shutdown();
   system_thread_.join();
   removeRedundant();
+
+  released_ = true;
   
   if(save_map_) {
     posmap_->options.set(ORB_SLAM2::Osmap::NO_FEATURES_DESCRIPTORS | ORB_SLAM2::Osmap::ONLY_MAPPOINTS_FEATURES, 1); 
@@ -257,8 +269,6 @@ void Session::release() {
   visualize_ = false;
 
   cv::destroyAllWindows();
-
-  released_ = true;
 }
 
 // cancel session
@@ -292,10 +302,12 @@ cv::Mat Session::getImageBGR(py::array_t<uint8_t>& input) {
 }
 
 void Session::removeRedundant() {
-  if(released_)
+  if(released_ || loc_mode_)
     return;
   // remove redundant image files
   const std::string dir = psystem_->keyframe_dir_;
+  if(dir.length() == 0)
+    return;
 
   auto keyframes = psystem_->map_->GetAllKeyFrames();
   std::set<unsigned long> kfids;

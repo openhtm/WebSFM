@@ -46,10 +46,10 @@ class Session {
 public:
   // constructor from config file
   Session(const std::string voc_file, const std::string config_file, 
-    bool force_realtime, const std::string keyframe_dir);
+    bool force_realtime = true, const std::string keyframe_dir = "");
   // fast constructor from image size
   Session(const std::string voc_file, const int imwidth, const int imheight,
-    bool force_realtime, const std::string keyframe_dir);
+    bool force_realtime = true, const std::string keyframe_dir = "");
 
 public:
   // add new image frame
@@ -67,13 +67,17 @@ public:
   // get camera twc under openGL coordinate
   Eigen::Matrix4d getTwcGL();
   // set map save status
-  void setSaveMap(bool save_map, const std::string map_name);
+  void setSaveMap(bool save_map, const std::string map_name = "");
   // load map
-  void loadMap(bool track_only, const std::string filename);
+  void loadMap(const std::string filename);
+  // activate loc mode
+  void activateLocalization();
+  // deactivate loc mode
+  void deactivateLocalization();
   // set mvs save status
   void setSaveScene(bool save_scene, const std::string scene_name);
   // enable viewer thread
-  void enableViewer(bool off_screen = true);
+  void enableViewer(bool off_screen = true, int view_width = 1024, int view_height = 768);
   // stop session
   void release();
   // cancel session
@@ -93,6 +97,7 @@ private:
   bool save_map_ = false;
   bool save_scene_ = false;
   bool save_pcd_ = false;
+  bool loc_mode_ = false;
   
   std::string map_name_ = "";
   std::string scene_name_ = "";
@@ -116,7 +121,7 @@ PYBIND11_MODULE(pysfm, m) {
   py::class_<Session>(m, "Session")
     .def(py::init<const std::string, const std::string, bool, const std::string>(), py::arg("voc_file"), py::arg("config_file"), py::arg("force_realtime") = false, py::arg("keyframe_dir") = "")
     .def(py::init<const std::string, const int, const int, bool, const std::string>(), py::arg("voc_file"), py::arg("imwidth"), py::arg("imheight"), py::arg("force_realtime") = false, py::arg("keyframe_dir") = "")
-    .def("enable_viewer", &Session::enableViewer, py::arg("off_screen") = true)
+    .def("enable_viewer", &Session::enableViewer, py::arg("off_screen") = true, py::arg("view_width") = 1024, py::arg("view_height") = 768)
     .def("add_track", &Session::addTrack, py::arg("image"), py::arg("time_ms") = -1)
     .def("tracking_state", &Session::getTrackingState)
     .def("get_feature_points", &Session::getFeaturePoints)
@@ -126,7 +131,9 @@ PYBIND11_MODULE(pysfm, m) {
     .def("get_orb_visual", &Session::getOrbVisualFrame)
     .def("save_map", &Session::setSaveMap, py::arg("save_map"), py::arg("map_name") = "")
     .def("save_mvs", &Session::setSaveScene, py::arg("save_scene"), py::arg("scene_name") = "")
-    .def("load_map", &Session::loadMap, py::arg("track_only") = true, py::arg("filename"))
+    .def("load_map", &Session::loadMap, py::arg("filename"))
+    .def("activate_localization", &Session::activateLocalization)
+    .def("activate_mapping", &Session::deactivateLocalization)
     .def("release", &Session::release)
     .def("cancel", &Session::cancel);
 }
