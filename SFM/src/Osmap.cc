@@ -802,7 +802,7 @@ void Osmap::serialize(const Mat &m, SerializedPose *serializedPose){
 }
 
 void Osmap::serialize(const Eigen::Matrix4d& m, SerializedPose *serializedPose) {
-	for(int i = 0; i < 4; i++)
+	for(int i = 0; i < 3; i++)
 		for(int j = 0; j < 4; j++)
 			serializedPose->add_element((float)m(i,j));
 }
@@ -817,8 +817,8 @@ void Osmap::deserialize(const SerializedPose &serializedPose, Mat &m){
 
 void Osmap::deserialize(const SerializedPose &serializedPose, Eigen::Matrix4d& m){
   assert(serializedPose.element_size() == 12);
-  m = Eigen::Matrix4d::Zero();
-	for(int i = 0; i < 4; i++)
+  m = Eigen::Matrix4d::Identity();
+	for(int i = 0; i < 3; i++)
 		for(int j = 0; j < 4; j++)
 			m(i,j) = serializedPose.element(i*4+j);
 }
