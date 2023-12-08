@@ -54,12 +54,12 @@ Viewer::Viewer(System* system, const std::string& string_setting_file)
   if (fps < 1) fps = 30;
   T_ = 1e3 / fps;
 
-  img_width_ = fSettings["Camera.width"];
-  img_height_ = fSettings["Camera.height"];
-  if (img_width_ < 1 || img_height_ < 1) {
-    img_width_ = 640;
-    img_height_ = 480;
-  }
+  // img_width_ = fSettings["Camera.width"];
+  // img_height_ = fSettings["Camera.height"];
+  // if (img_width_ < 1 || img_height_ < 1) {
+  //   img_width_ = 640;
+  //   img_height_ = 480;
+  // }
 
   view_point_x_ = fSettings["Viewer.ViewpointX"];
   view_point_y_ = fSettings["Viewer.ViewpointY"];
@@ -69,7 +69,11 @@ Viewer::Viewer(System* system, const std::string& string_setting_file)
   spdlog::info("Viewer created");
 }
 
-Viewer::Viewer(System* system) : system_(system), exit_required_(false)
+Viewer::Viewer(System* system, const int view_width, const int view_height)
+  : system_(system), 
+    exit_required_(false),
+    view_width_(view_width),
+    view_height_(view_height)
 {
   frame_drawer_ = new FrameDrawer(system_->map_);
   map_drawer_ = new MapDrawer(system_->map_);
@@ -80,9 +84,6 @@ Viewer::Viewer(System* system) : system_(system), exit_required_(false)
   tracker_->SetMapDrawer(map_drawer_);
 
   T_ = 1e3 / 30;
-
-  img_width_ = 640;
-  img_height_ = 480;
 
   view_point_x_ = 0;
   view_point_y_ = -0.7;
@@ -132,7 +133,7 @@ void Viewer::Run(bool off_screen) {
   std::string frame_title = "frame_" + mscts;
 
   auto params = off_screen ? pangolin::Params({{"scheme", "headless"}}) : pangolin::Params();
-  pangolin::CreateWindowAndBind(map_title, 640, 480, params);
+  pangolin::CreateWindowAndBind(map_title, view_width_, view_height_, params);
 
   // 3D Mouse handler requires depth testing to be enabled
   glEnable(GL_DEPTH_TEST);
@@ -145,23 +146,23 @@ void Viewer::Run(bool off_screen) {
 
   // Define Camera Render Object (for view / scene browsing)
   pangolin::OpenGlRenderState s_cam(
-      pangolin::ProjectionMatrix(640, 480, view_point_f_, view_point_f_, 320,
-                                 250, 0.1, 1000),
+      pangolin::ProjectionMatrix(view_width_, view_height_, view_point_f_, view_point_f_, view_width_ / 2,
+                                 view_height_ / 2, 0.1, 1000),
       pangolin::ModelViewLookAt(view_point_x_, view_point_y_, view_point_z_, 0,
                                 0, 0, 0.0, -1.0, 0.0));
 
   // Add named OpenGL viewport to window and provide 3D Handler
   pangolin::View& d_cam = pangolin::CreateDisplay()
                               .SetBounds(0.0, 1.0, 0,
-                                         1.0, -640.0f / 480.0f)
+                                         1.0, -((float)view_width_) / ((float)view_height_))
                               .SetHandler(new pangolin::Handler3D(s_cam));
 
   pangolin::OpenGlMatrix Twc;
   Twc.SetIdentity();
 
   // create a frame buffer object with colour and depth buffer
-  pangolin::GlTexture color_buffer(640 * (int)off_screen, 480 * (int)off_screen);
-  pangolin::GlRenderBuffer depth_buffer(640 * (int)off_screen, 480 * (int)off_screen);
+  pangolin::GlTexture color_buffer(view_width_ * (int)off_screen, view_height_ * (int)off_screen);
+  pangolin::GlRenderBuffer depth_buffer(view_width_ * (int)off_screen, view_height_ * (int)off_screen);
   pangolin::GlFramebuffer fbo_buffer(color_buffer, depth_buffer);
   if(off_screen) fbo_buffer.Bind();
 
