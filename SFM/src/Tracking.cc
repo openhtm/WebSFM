@@ -890,14 +890,10 @@ void Tracking::SaveKeyFrame(ORB_SLAM2::KeyFrame* kf, cv::Mat& img) {
 
 void Tracking::SearchLocalPoints() {
   // Do not search map points already matched
-  for (std::vector<MapPoint*>::iterator
-           vit = current_frame_.map_points_.begin(),
-           vend = current_frame_.map_points_.end();
-       vit != vend; vit++) {
-    MapPoint* map_point = *vit;
+  for (auto& map_point : current_frame_.map_points_) {
     if (map_point) {
       if (map_point->isBad()) {
-        *vit = static_cast<MapPoint*>(nullptr);
+        map_point = static_cast<MapPoint*>(nullptr);
       } else {
         map_point->IncreaseVisible();
         map_point->last_seen_frame_id_ = current_frame_.id_;
@@ -909,10 +905,7 @@ void Tracking::SearchLocalPoints() {
   int n_to_match = 0;
 
   // Project points in frame and check its visibility
-  for (std::vector<MapPoint*>::iterator vit = local_map_points_.begin(),
-                                        vend = local_map_points_.end();
-       vit != vend; vit++) {
-    MapPoint* map_point = *vit;
+  for (auto& map_point : local_map_points_) {
     if (map_point->last_seen_frame_id_ == current_frame_.id_) continue;
     if (map_point->isBad()) continue;
     // Project (this fills MapPoint variables for matching)
@@ -944,16 +937,10 @@ void Tracking::UpdateLocalMap() {
 void Tracking::UpdateLocalPoints() {
   local_map_points_.clear();
 
-  for (std::vector<KeyFrame*>::const_iterator itKF = local_keyframes_.begin(),
-                                              itEndKF = local_keyframes_.end();
-       itKF != itEndKF; itKF++) {
-    KeyFrame* keyframe = *itKF;
+  for (auto& keyframe : local_keyframes_) {
     const vector<MapPoint*> map_point_matches = keyframe->GetMapPointMatches();
 
-    for (vector<MapPoint*>::const_iterator itMP = map_point_matches.begin(),
-                                           itEndMP = map_point_matches.end();
-         itMP != itEndMP; itMP++) {
-      MapPoint* map_point = *itMP;
+    for (auto& map_point : map_point_matches) {
       if (!map_point) {
         continue;
       }
@@ -977,11 +964,8 @@ void Tracking::UpdateLocalKeyFrames() {
       if (!map_point->isBad()) {
         const std::map<KeyFrame*, size_t> observations =
             map_point->GetObservations();
-        for (std::map<KeyFrame*, size_t>::const_iterator
-                 it = observations.begin(),
-                 itend = observations.end();
-             it != itend; it++)
-          keyframeCounter[it->first]++;
+        for (auto& it : observations)
+          keyframeCounter[it.first]++;
       } else {
         current_frame_.map_points_[i] = nullptr;
       }
@@ -1018,24 +1002,16 @@ void Tracking::UpdateLocalKeyFrames() {
 
   // Include also some not-already-included keyframes that are neighbors to
   // already-included keyframes
-  for (vector<KeyFrame*>::const_iterator itKF = local_keyframes_.begin(),
-                                         itEndKF = local_keyframes_.end();
-       itKF != itEndKF; itKF++) {
+  for (auto& keyframe : local_keyframes_) {
     // Limit the number of keyframes
     if (local_keyframes_.size() > 80) break;
-
-    KeyFrame* keyframe = *itKF;
 
     const vector<KeyFrame*> neighbor_keyframes =
         keyframe->GetBestCovisibilityKeyFrames(10);
 
-    for (vector<KeyFrame*>::const_iterator it = neighbor_keyframes.begin(),
-                                           itend = neighbor_keyframes.end();
-         it != itend; it++) {
-      KeyFrame* neighbor_keyframe = *it;
+    for (auto & neighbor_keyframe : neighbor_keyframes) {
       if (!neighbor_keyframe->isBad()) {
-        if (neighbor_keyframe->track_reference_for_frame_ !=
-            current_frame_.id_) {
+        if (neighbor_keyframe->track_reference_for_frame_ != current_frame_.id_) {
           local_keyframes_.push_back(neighbor_keyframe);
           neighbor_keyframe->track_reference_for_frame_ = current_frame_.id_;
           break;
@@ -1044,10 +1020,7 @@ void Tracking::UpdateLocalKeyFrames() {
     }
 
     const std::set<KeyFrame*> childrens = keyframe->GetChilds();
-    for (std::set<KeyFrame*>::const_iterator sit = childrens.begin(),
-                                             send = childrens.end();
-         sit != send; sit++) {
-      KeyFrame* child_keyframe = *sit;
+    for (auto& child_keyframe : childrens) {
       if (!child_keyframe->isBad()) {
         if (child_keyframe->track_reference_for_frame_ != current_frame_.id_) {
           local_keyframes_.push_back(child_keyframe);
