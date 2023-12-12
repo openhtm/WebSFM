@@ -178,6 +178,14 @@ Eigen::Matrix4d Session::getTwcGL() {
   return Twc;
 }
 
+Eigen::Matrix4d Session::getTwcThree(){
+  if(released_) return Eigen::Matrix4d::Identity();
+
+  Eigen::Matrix4d Twc = psystem_->GetTwc();
+  Eigen::Matrix4d Twc_ = MAT_X44D_CV2GL_ * Twc * MAT_X44D_CV2GL_;
+  return Twc_;
+}
+
 // set map save status
 void Session::setSaveMap(bool save_map, const std::string map_name) {
   if(released_) return;

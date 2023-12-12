@@ -66,6 +66,8 @@ public:
   Eigen::Matrix4d getTwc();
   // get camera twc under openGL coordinate
   Eigen::Matrix4d getTwcGL();
+  // get camera twc for three.js
+  Eigen::Matrix4d getTwcThree();
   // set map save status
   void setSaveMap(bool save_map, const std::string map_name = "");
   // load map
@@ -127,6 +129,7 @@ PYBIND11_MODULE(pysfm, m) {
     .def("get_feature_points", &Session::getFeaturePoints)
     .def("get_position_cv", &Session::getTwc)
     .def("get_position_gl", &Session::getTwcGL)
+    .def("get_position_three", &Session::getTwcThree)
     .def("get_map_visual", &Session::getMapVisualFrame)
     .def("get_orb_visual", &Session::getOrbVisualFrame)
     .def("save_map", &Session::setSaveMap, py::arg("save_map"), py::arg("map_name") = "")

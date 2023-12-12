@@ -72,7 +72,6 @@ class SfmTrack(MediaStreamTrack):
     self.session_id = session_id
     self.track = None
     self.channels = channels
-    self.frame2d = True
     self.create_mode = create_mode
     self.map_id = str(map_id)
     self.released = False
@@ -94,7 +93,7 @@ class SfmTrack(MediaStreamTrack):
   def create_session(self):
     # create session
     self.session = pysfm.Session(FBOW_PATH, 640, 480, force_realtime=True, keyframe_dir=str(self.folder/'images'))
-    self.session.enable_viewer()
+    self.session.enable_viewer(False)
 
     if self.create_mode:
       init_dir(self.session_id)
@@ -141,7 +140,7 @@ class SfmTrack(MediaStreamTrack):
     img = self.session.get_map_visual()
     if img.size > 0: new_frame = VideoFrame.from_ndarray(img, format='bgr24')
     # push position
-    position = self.session.get_position_gl()
+    position = self.session.get_position_three()
     features = self.session.get_feature_points()
     state = self.session.tracking_state()
 
