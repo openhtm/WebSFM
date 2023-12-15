@@ -1,0 +1,4 @@
+[submodule "SFM/source"]
+	path = SFM/source
+	url = git@github.com:Jianxff/Structure-PL-SLAM-Interface.git
+	branch = main
