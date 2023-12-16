@@ -1,0 +1,21 @@
+#==============#
+# Camera Model #
+#==============#
+Camera.name: "webrtc"
+Camera.setup: "monocular"
+Camera.model: "perspective"
+Camera.fps: 60.0
+Camera.color_order: "GBR"
+#================#
+# ORB Parameters #
+#================#
+Feature.max_num_keypoints: 1000
+Feature.scale_factor: 1.2
+Feature.num_levels: 5
+Feature.ini_fast_threshold: 20
+Feature.min_fast_threshold: 7
+#=====================#
+# Tracking Parameters #
+#=====================#
+depth_threshold: 35
+

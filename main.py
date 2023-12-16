@@ -4,8 +4,10 @@ import argparse
 # web application
 from aiohttp import web
 # handler
-from handler.session import session_handler, on_shutdown, MVS_PIPE
+from handler.session import session_handler, on_shutdown
 from handler.retrieve import query_scenes, remove_scene, query_info, define_base,  define_grid, define_landmark
+# MVS
+from SFM.core import MVS_PIPE
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="WebRTC-SLAM API Server")
