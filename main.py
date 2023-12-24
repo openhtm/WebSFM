@@ -4,7 +4,7 @@ import argparse
 # web application
 from aiohttp import web
 # handler
-from handler.session import session_handler, on_shutdown
+from handler.session import session_capture_handler, session_review_handler, on_shutdown
 from handler.retrieve import query_scenes, remove_scene, query_info, define_base,  define_grid, define_landmark
 # MVS
 from SFM.core import MVS_PIPE
@@ -29,7 +29,8 @@ if __name__ == "__main__":
 
   app = web.Application()
   app.on_shutdown.append(on_shutdown)
-  app.router.add_post('/session', session_handler)
+  app.router.add_post('/session/capture', session_capture_handler)
+  app.router.add_post('/session/review', session_review_handler)
   app.router.add_get('/retrieve', query_scenes)
   app.router.add_post('/remove', remove_scene)
   app.router.add_get('/detail', query_info)

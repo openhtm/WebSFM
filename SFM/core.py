@@ -26,7 +26,7 @@ import numpy as np
 from SFM import pysfm
 from SFM.mvs import MVSPipe
 ######################################################################################################################################################
-
+relay = MediaRelay()
 FBOW_PATH = str(Path(__file__).parent/'source/vocab/orb_mur.fbow')
 CONF_PATH = str(Path(__file__).parent/'config.yaml')
 MVS_PIPE = MVSPipe('/usr/local/bin/OpenMVS')
@@ -40,6 +40,7 @@ class NumpyArrayEncoder(json.JSONEncoder):
         return JSONEncoder.default(self, obj)
 
 ######################################################################################################################################################
+response = VideoFrame.from_ndarray(np.zeros((48, 64, 3), np.uint8), format='rgb24')
 # base track class
 class BaseTrack(MediaStreamTrack):
     kind = 'video'
@@ -47,9 +48,9 @@ class BaseTrack(MediaStreamTrack):
     track = None
     released = False
     base_dir = None
-    response = VideoFrame.from_ndarray(np.zeros((1, 1, 3), np.uint8), format='rgb24')
     on_release_callback = None
     on_terminate_callback = None
+    on_recv_call = None
 
     ### init
     def __init__(self, uid, pc, usr_dir):
@@ -71,7 +72,7 @@ class BaseTrack(MediaStreamTrack):
         # track images
         @pc.on('track')
         def on_track(track):
-            self.track = MediaRelay().subscribe(track)
+            self.track = relay.subscribe(track)
             pc.addTrack(self)
             @track.on('ended')
             async def on_ended():
@@ -80,10 +81,6 @@ class BaseTrack(MediaStreamTrack):
         @pc.on('datachannel')
         def on_datachannel(channel):
             pass
-
-    ### add track source
-    def set_track(self,track):
-        self.track = track
 
     ### complete scanning
     def release(self):
@@ -117,11 +114,15 @@ class BaseTrack(MediaStreamTrack):
         if not self.released:
             try: self.data_channel.send(json.dumps(data, cls=NumpyArrayEncoder))
             except Exception as e: logging.warn(e)
+        
+        # call function
+        if self.on_recv_call is not None:
+            self.on_recv_call()
 
         # return empty response
-        self.response.pts = frame.pts
-        self.response.time_base = frame.time_base
-        return self.response
+        response.pts = frame.pts
+        response.time_base = frame.time_base
+        return response
 
 
 ######################################################################################################################################################
@@ -140,7 +141,7 @@ class CaptureTrack(BaseTrack):
         self.on_terminate_callback = self.on_cancel
         # set protobuf channel
         self.proto_channel = pc.createDataChannel('protobuf')
-        self.proto_thread = threading.Thread(target=self.async_proto_thread)
+        self.on_recv_call = self.on_recv
 
     def init_dir(self):
         if os.path.exists(self.base_dir):
@@ -156,11 +157,11 @@ class CaptureTrack(BaseTrack):
     
     def create(self, imw = 640, imh = 480, line=False):
         self.init_dir()
-        config = pysfm.Config(CONF_PATH).vocab(FBOW_PATH)
+        config = pysfm.Config(CONF_PATH).vocab(FBOW_PATH).visualize()
         config.model(imw, imh).line_track(line)
         config.serialize(self.map_path, self.scene_path, self.raw_img_dir)
         self.session = pysfm.Session(config)  
-        self.proto_thread.start()
+        # self.proto_thread.start()
 
     def on_success(self, data):
         MVS_PIPE.add_task(self.scene_path)
@@ -173,24 +174,15 @@ class CaptureTrack(BaseTrack):
         if os.path.exists(self.base_dir):
             shutil.rmtree(self.base_dir)
     
-    def set_after_release(self, callback):
-        self.after_release = callback
-
-    def async_proto_thread(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.async_send_proto())
-        loop.close()
-
-    ### map protobuf 
-    async def async_send_proto(self):
-        while not self.released:
-            if self.session is None: continue
+    def on_recv(self):
+        if not self.released:
             buf = self.session.get_map_protobuf()
             if len(buf) > 0:
                 try: self.proto_channel.send(buf)
                 except Exception as e: logging.warn(e)
-        logging.info('protobuf channel closed')
+    
+    def set_after_release(self, callback):
+        self.after_release = callback
       
 
 ######################################################################################################################################################

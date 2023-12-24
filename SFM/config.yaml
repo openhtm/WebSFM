@@ -5,7 +5,8 @@ Camera.name: "webrtc"
 Camera.setup: "monocular"
 Camera.model: "perspective"
 Camera.fps: 60.0
-Camera.color_order: "GBR"
+Camera.color_order: "BGR"
+
 #================#
 # ORB Parameters #
 #================#
@@ -14,8 +15,23 @@ Feature.scale_factor: 1.2
 Feature.num_levels: 5
 Feature.ini_fast_threshold: 20
 Feature.min_fast_threshold: 7
+
 #=====================#
 # Tracking Parameters #
 #=====================#
 depth_threshold: 35
 
+#===========================#
+# PangolinViewer Parameters #
+#===========================#
+PangolinViewer.keyframe_size: 0.07
+PangolinViewer.keyframe_line_width: 1
+PangolinViewer.graph_line_width: 1
+PangolinViewer.point_size: 10
+PangolinViewer.camera_size: 0.08
+PangolinViewer.camera_line_width: 3
+PangolinViewer.viewpoint_x: 0
+PangolinViewer.viewpoint_y: -0.65
+PangolinViewer.viewpoint_z: -1.9
+PangolinViewer.viewpoint_f: 400
+PangolinViewer.landmark_rgb: True

@@ -1,3 +1,9 @@
+######### no loggin warning on av ############
+import av.logging
+restore_default_callback = lambda *args: args
+av.logging.restore_default_callback = restore_default_callback
+av.logging.set_level(av.logging.ERROR)
+##############################################
 # tools 
 import logging
 import ssl
@@ -20,53 +26,55 @@ USR_DIR = ROOTDIR/'static/usr'
 pcs = set()
 
 ######################################################################################################################################################
-# webrtc session handler
-async def session_handler(request):
+# capture session handler
+async def session_capture_handler(request):
     params = await request.json()
-    mode, uid = params.get('mode', None), params.get('uid', None)
+    pc = RTCPeerConnection()
 
-    offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
-    pc = RTCPeerConnection() 
-    pcs.add(pc)
-
-    session_id = str(uuid.uuid1()) if mode == 'capture' else uid
-
+    imwidth, imheight = params.get('width', 640), params.get('height', 480)
+    session_id = str(uuid.uuid1())
+    
     # create data channel to send position and state
-    TrackSession = None
-    
-    if mode == 'capture':
-        def callback(uid, data): 
-            append_info(uid, {'nkfs' : int(data[0]), 'nmps' : int(data[1])})
-        TrackSession = CaptureTrack(session_id, pc, USR_DIR)
-        TrackSession.set_after_release(callback)
-    
-    elif mode == 'review':
-        if uid is None:  return web.json_response({'status': False, 'msg' : 'no such scene'})
-        TrackSession = ReviewTrack(session_id, pc, USR_DIR)
-    
-    else:
-        return web.json_response({'status': False, 'msg' : 'invalid mode'})
-    
-    TrackSession.create()
+    TrackSession = CaptureTrack(session_id, pc, USR_DIR)
+    TrackSession.create(imwidth, imheight)
+
+    return await session_handler(params, pc, TrackSession)
+
+# review session handler
+async def session_review_handler(request):
+    params = await request.json()
+    pc = RTCPeerConnection()
+
+    imwidth, imheight = params.get('width', 640), params.get('height', 480)
+    target_id = params.get('target', None)
+    if target_id is None:  return web.json_response({'status': False, 'msg' : 'no such scene'})
+
+    TrackSession = ReviewTrack(target_id, pc, USR_DIR)
+    TrackSession.create(imwidth, imheight)
+
+    return await session_handler(params, pc, TrackSession)
+
+# basic session handler
+async def session_handler(params, pc, session):
+    offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
+    pcs.add(pc)
 
     @pc.on('connectionstatechange')
     async def on_connectionstatechange():
         if pc.connectionState == 'failed':
-            logging.warning('Connection %s failed', session_id)
-            TrackSession.terminate()
+            logging.warning('Connection %s failed', session.uid)
+            session.terminate()
             await pc.close()
             pcs.discard(pc)
 
     # handle offer
     await pc.setRemoteDescription(offer)
-
     # send answer
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
   
     return web.json_response({
-        'status' : True,
-        'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type
+        'status' : True, 'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type
     })
 
 # close all rtc connection when shut down
