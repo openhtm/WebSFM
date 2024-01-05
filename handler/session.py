@@ -18,7 +18,7 @@ from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription
 # io tools
 from handler.tools import write_info, read_info, append_info
 # sfm module
-from SFM.core import CaptureTrack, ReviewTrack, MVS_PIPE
+from SFM.core import CaptureTrack, ReviewTrack
 
 ROOTDIR = Path(__file__).parent.parent
 USR_DIR = ROOTDIR/'static/usr'
@@ -79,7 +79,6 @@ async def session_handler(params, pc, session):
 
 # close all rtc connection when shut down
 async def on_shutdown(app):
-    MVS_PIPE.release()
     # close peer connections
     coros = [pc.close() for pc in pcs]
     await asyncio.gather(*coros)

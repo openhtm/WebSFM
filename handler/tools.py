@@ -10,7 +10,7 @@ USR_DIR = ROOTDIR/'static/usr'
 
 def write_info(uid, data):
   if uid is not None:
-    with open(str(USR_DIR/str(uid)/'info.json'), 'w') as f:
+    with open(str(USR_DIR/str(uid)/'map.json'), 'w') as f:
       json.dump(data, f)
 
 def append_info(uid, data):
@@ -21,24 +21,27 @@ def append_info(uid, data):
     write_info(uid, info)
 
 def read_info(uid):
-  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'info.json')):
-    with open(str(USR_DIR/str(uid)/'info.json'), 'r') as f:
+  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'map.json')):
+    with open(str(USR_DIR/str(uid)/'map.json'), 'r') as f:
       return json.load(f)
-  else:
-    return {}
+  # not found
+  return {}
 
-def read_yaml(uid):
-  if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'map.yaml')):
-    with open(str(USR_DIR/str(uid)/'map.yaml'), 'r') as f:
-      f.readline()
-      return yaml.safe_load(f)
-  else:
-    return {}
+def get_first_image(uid):
+  folder = str(USR_DIR/str(uid)/'images')
+  if uid is not None and os.path.exists(folder):
+    all_files = os.listdir(folder)
+    for file_name in all_files:
+        if file_name.lower().endswith(('.png')):
+            return os.path.join('/static/usr', uid, 'images', file_name)
+    return os.listdir(str(USR_DIR/str(uid)/'images'))
+  # not found
+  return ''
 
 def read_status(uid):
   if uid is not None and os.path.exists(str(USR_DIR/str(uid)/'scene/status.log')):
     with open(str(USR_DIR/str(uid)/'scene/status.log'), 'r') as f:
       status = f.readline()
       return int(status)
-  else:
-    return -1
+  # not found
+  return -1

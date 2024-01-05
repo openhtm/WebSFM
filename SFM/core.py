@@ -24,12 +24,12 @@ from aiortc.contrib.media import MediaRelay
 # sfm module
 import numpy as np
 from SFM import pysfm
-from SFM.mvs import MVSPipe
+from SFM.task import TASK_PIPE
+
 ######################################################################################################################################################
 relay = MediaRelay()
 FBOW_PATH = str(Path(__file__).parent/'source/vocab/orb_mur.fbow')
 CONF_PATH = str(Path(__file__).parent/'config.yaml')
-MVS_PIPE = MVSPipe('/usr/local/bin/OpenMVS')
 
 ######################################################################################################################################################
 # encode numpy.ndarray to json
@@ -150,9 +150,9 @@ class CaptureTrack(BaseTrack):
         os.mkdir(self.raw_img_dir)
         os.mkdir(str(self.base_dir/'scene'))
         # write basic info
-        with open(str(self.base_dir/'info.json'), 'w') as f:
+        with open(str(self.base_dir/'map.json'), 'w') as f:
             json.dump({'id': str(self.uid), 
-                'time': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                'time': time.strftime("%Y-%m-%d %H:%M", time.localtime())
             }, f)
     
     def create(self, imw = 640, imh = 480, line=False):
@@ -164,7 +164,7 @@ class CaptureTrack(BaseTrack):
         # self.proto_thread.start()
 
     def on_success(self, data):
-        MVS_PIPE.add_task(self.scene_path)
+        TASK_PIPE.add_task(self.base_dir)
         if self.after_release is not None:
             self.after_release(self.uid, data)
     
@@ -197,3 +197,4 @@ class ReviewTrack(BaseTrack):
         config.model(imw, imh).line_track(line)
         config.database(self.map_path)
         self.session = pysfm.Session(config)
+

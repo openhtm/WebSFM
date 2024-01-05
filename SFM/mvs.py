@@ -5,60 +5,21 @@ import os
 import logging
 import shutil
 
-logger = logging.getLogger('MVSPipe')
-
-class MVSPipe(Process):
-  tasks = Queue()
-  exit_required = False
-
-  def __init__(self, mvs_path):
-    super().__init__()
-    self.mvs_path = Path(mvs_path)
-  
-  def run(self):
-    logger.info('Pipe is running, waiting for new task.')
-
-    while not self.exit_required:
-      task = self.tasks.get()
-      if task is None:
-        break
-
-      logger.info('new task received')
-      if isinstance(task, MVS):
-        logger.info(f'running mvs task {task.scene}')
-        task.generate()
-
-  def add_task(self, scene):
-    if self.exit_required:
-      logger.error('mvs pipe is closed')
-      return
-    
-    task = MVS(self.mvs_path, scene)
-    self.tasks.put(task)
-
-  def release(self):
-    logger.info('Pipe will be release')
-    self.tasks.put(None)
-    self.exit_required = True
-
-  def terminate(self):
-    logger.info('Pipe terminated')
-    self.exit_required = True
-    super().terminate()
-
+logger = logging.getLogger('openMVS')
 
 class MVS:
-  def __init__(self, mvs_path, scene):
+  def __init__(self, mvs_path, scene_dir):
     self.mvs_path = Path(mvs_path)
+    self.scene_dir = Path(scene_dir)
     
     self.cmd_densify = str(self.mvs_path/'DensifyPointCloud')
     self.cmd_reconstruct = str(self.mvs_path/'ReconstructMesh')
     self.cmd_texture = str(self.mvs_path/'TextureMesh')
 
     self.code = 0
-    self.scene = Path(scene)
+    self.scene = Path(self.scene_dir/'scene.mvs')
 
-    self.log_path = Path(scene).parent / 'status.log'
+    self.log_path = Path(self.scene).parent / 'status.log'
     self.log(0)
 
   def log(self, code):
@@ -157,3 +118,44 @@ class MVS:
     
 
 
+# ROOTDIR = Path(__file__).parent.parent
+# USR_DIR = ROOTDIR/'static/usr'
+
+# class MVSPipe(Process):
+#   tasks = Queue()
+#   exit_required = False
+
+#   def __init__(self, mvs_path):
+#     super().__init__()
+#     self.mvs_path = Path(mvs_path)
+  
+#   def run(self):
+#     logger.info('Pipe is running, waiting for new task.')
+
+#     while not self.exit_required:
+#       task = self.tasks.get()
+#       if task is None:
+#         break
+
+#       logger.info('new task received')
+#       if isinstance(task, MVS):
+#         logger.info(f'running mvs task {task.scene}')
+#         task.generate()
+
+#   def add_task(self, scene):
+#     if self.exit_required:
+#       logger.error('mvs pipe is closed')
+#       return
+    
+#     task = MVS(self.mvs_path, scene)
+#     self.tasks.put(task)
+
+#   def release(self):
+#     logger.info('Pipe will be release')
+#     self.tasks.put(None)
+#     self.exit_required = True
+
+#   def terminate(self):
+#     logger.info('Pipe terminated')
+#     self.exit_required = True
+#     super().terminate()

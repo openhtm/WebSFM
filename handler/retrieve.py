@@ -8,7 +8,7 @@ from pathlib import Path
 import asyncio
 from aiohttp import web
 # io tools
-from handler.tools import write_info, read_info, read_yaml, read_status
+from handler.tools import write_info, read_info, read_status, get_first_image
 
 ROOTDIR = Path(__file__).parent.parent
 USR_DIR = ROOTDIR/'static/usr'
@@ -17,20 +17,19 @@ logger = logging.getLogger('Retrieve')
 
 # query all scenes
 async def query_scenes(request):
-  data = {}
+  data = []
   for folder in os.listdir(str(USR_DIR)):
     if os.path.isdir(str(USR_DIR/folder)):
       # basic infomation
       basic = read_info(folder)
-      
       # mvs status
-      status = read_status(folder)
-      basic['status'] = status
-
+      basic['status'] = read_status(folder)
       if 'grid' in basic: basic['status'] = 4
+      # image
+      basic['img'] = get_first_image(folder)
 
       # add to dict
-      data[folder] = basic
+      data.append(basic)
   
   return web.json_response(data)
 

@@ -1,13 +1,14 @@
 # tools
 import logging
 import argparse
+from pathlib import Path
 # web application
 from aiohttp import web
 # handler
 from handler.session import session_capture_handler, session_review_handler, on_shutdown
 from handler.retrieve import query_scenes, remove_scene, query_info, define_base,  define_grid, define_landmark
 # MVS
-from SFM.core import MVS_PIPE
+from SFM.task import TASK_PIPE
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="WebRTC-SLAM API Server")
@@ -39,7 +40,7 @@ if __name__ == "__main__":
   app.router.add_post('/landmark', define_landmark)
   app.router.add_static('/static', './static')
 
-  MVS_PIPE.start()
+  TASK_PIPE.start()
   
   web.run_app(
     app, access_log=None, host=args.host, port=args.port, ssl_context=ssl_context,
